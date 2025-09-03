@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Rental Income Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Earthy Neutral -->
+    <!-- Application Structure Plan: The application is designed as an interactive dashboard. This structure was chosen for maximum usability, allowing the user to see key financial metrics at a glance (Total Income, Expenses, Net Profit), visualize trends over time with a bar chart, and manage detailed transactions through a tabbed interface with an integrated form. This is superior to a static report because it centralizes data viewing and data entry, providing immediate feedback as new transactions are added. The user flow is: 1. Absorb high-level summary. 2. Analyze visual trends. 3. Drill down into specific income/expense lists. 4. Add new data, which instantly updates all other components. -->
+    <!-- Visualization & Content Choices: 
+        - Report Info: Financial Summary (Total Income, Expenses, Net) -> Goal: Inform -> Viz/Presentation: Large text "Stat Cards" -> Interaction: Dynamic updates -> Justification: Provides the most critical data points for immediate consumption.
+        - Report Info: Monthly Income vs. Expenses -> Goal: Compare/Change -> Viz/Presentation: Bar Chart -> Interaction: Hover tooltips, dynamic updates on new data -> Justification: Visually represents financial performance over time, making trends easy to spot. Library: Chart.js (Canvas).
+        - Report Info: Income/Expense line items -> Goal: Organize -> Viz/Presentation: Tabbed HTML Tables -> Interaction: Add/Delete entries via integrated form -> Justification: Provides detailed, organized data views without cluttering the UI.
+        - Report Info: New Data Entry -> Goal: Interact/Update -> Viz/Presentation: HTML Form -> Interaction: Form submission triggers full app update -> Justification: Transforms the static report into a functional, live tool.
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #F9F9F7;
+            color: #383838;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 900px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 300px;
+            max-height: 40vh;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 400px;
+            }
+        }
+        .stat-card {
+            background-color: #FFFFFF;
+            border: 1px solid #E5E5E3;
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            text-align: center;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        .btn {
+            transition: background-color 0.3s;
+        }
+        .tab-btn {
+            transition: all 0.3s;
+            border-bottom: 2px solid transparent;
+        }
+        .tab-btn.active {
+            border-color: #A47F6A;
+            color: #A47F6A;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body class="antialiased">
+    <div class="container mx-auto p-4 md:p-8 max-w-7xl">
+        <header class="mb-8">
+            <h1 class="text-4xl font-bold text-gray-800">Rental Income Dashboard</h1>
+            <p id="propertyAddress" class="text-lg text-gray-500 mt-1">[Your Property Address Here]</p>
+        </header>
+
+        <main>
+            <section id="summary-cards" class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div class="stat-card">
+                    <h3 class="text-md font-medium text-gray-500">Total Income</h3>
+                    <p id="totalIncome" class="text-4xl font-bold text-green-600 mt-2">₱0.00</p>
+                </div>
+                <div class="stat-card">
+                    <h3 class="text-md font-medium text-gray-500">Total Expenses</h3>
+                    <p id="totalExpenses" class="text-4xl font-bold text-red-600 mt-2">₱0.00</p>
+                </div>
+                <div class="stat-card">
+                    <h3 class="text-md font-medium text-gray-500">Net Profit</h3>
+                    <p id="netProfit" class="text-4xl font-bold text-blue-600 mt-2">₱0.00</p>
+                </div>
+            </section>
+
+            <section id="chart-section" class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm mb-8">
+                <h2 class="text-2xl font-semibold text-gray-700 mb-4">Monthly Overview</h2>
+                 <p class="text-gray-600 mb-4">This chart provides a visual comparison of your total income and expenses for each month. Hover over the bars to see the exact amounts for each category, helping you to quickly identify trends in your property's financial performance.</p>
+                <div class="chart-container">
+                    <canvas id="incomeExpenseChart"></canvas>
+                </div>
+            </section>
+            
+            <div id="auth-container" class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm mt-8 max-w-lg mx-auto">
+                <h2 class="text-xl font-semibold text-gray-700 mb-4">Owner Login</h2>
+                <p class="text-gray-600 mb-4">Enter the password to access transaction history and management tools.</p>
+                <form id="auth-form" class="space-y-4">
+                    <div>
+                        <label for="password" class="sr-only">Password</label>
+                        <input type="password" name="password" id="password" placeholder="Enter password" required class="mt-1 focus:ring-[#A47F6A] focus:border-[#A47F6A] block w-full shadow-sm sm:text-sm border-gray-300 rounded-md">
+                    </div>
+                    <button type="submit" class="w-full btn bg-[#A47F6A] hover:bg-[#8e6b56] text-white font-bold py-2 px-4 rounded-lg">Log In</button>
+                </form>
+            </div>
+
+            <div id="transaction-manager" class="hidden">
+                 <div class="flex justify-between items-center mt-8 mb-4">
+                    <h2 class="text-3xl font-semibold text-gray-700">Owner Tools</h2>
+                    <button id="logout-btn" class="btn bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-lg">Log Out</button>
+                </div>
+                <section id="transactions-section" class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div class="lg:col-span-2 bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                        <h2 class="text-2xl font-semibold text-gray-700 mb-4">Transaction History</h2>
+                         <p class="text-gray-600 mb-4">Here you can view a detailed list of all your income and expense transactions. Use the tabs to switch between views. You can remove any transaction by clicking the 'Delete' button next to it.</p>
+                        <div class="border-b border-gray-200">
+                            <nav class="-mb-px flex space-x-6" aria-label="Tabs">
+                                <button id="income-tab" class="tab-btn active py-4 px-1 text-lg font-medium text-gray-500 hover:text-gray-700">Income</button>
+                                <button id="expenses-tab" class="tab-btn py-4 px-1 text-lg font-medium text-gray-500 hover:text-gray-700">Expenses</button>
+                            </nav>
+                        </div>
+                        
+                        <div id="income-table-container" class="mt-6">
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full divide-y divide-gray-200">
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tenant</th>
+                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                                            <th scope="col" class="relative px-6 py-3"><span class="sr-only">Delete</span></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="income-tbody" class="bg-white divide-y divide-gray-200">
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        <div id="expenses-table-container" class="hidden mt-6">
+                             <div class="overflow-x-auto">
+                                <table class="min-w-full divide-y divide-gray-200">
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                                            <th scope="col" class="relative px-6 py-3"><span class="sr-only">Delete</span></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="expenses-tbody" class="bg-white divide-y divide-gray-200">
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm h-fit">
+                        <h2 class="text-2xl font-semibold text-gray-700 mb-4">Add Transaction</h2>
+                        <p class="text-gray-600 mb-4">Use this form to add a new income or expense item. The dashboard will update automatically once you submit the entry.</p>
+                        <form id="transaction-form" class="space-y-4">
+                            <div>
+                                <label for="type" class="block text-sm font-medium text-gray-700">Type</label>
+                                <select id="type" name="type" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-[#A47F6A] focus:border-[#A47F6A] sm:text-sm rounded-md">
+                                    <option value="income">Income</option>
+                                    <option value="expense">Expense</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="date" class="block text-sm font-medium text-gray-700">Date</label>
+                                <input type="date" name="date" id="date" required class="mt-1 focus:ring-[#A47F6A] focus:border-[#A47F6A] block w-full shadow-sm sm:text-sm border-gray-300 rounded-md">
+                            </div>
+                            <div id="tenant-field">
+                                <label for="tenant" class="block text-sm font-medium text-gray-700">Tenant Name</label>
+                                <input type="text" name="tenant" id="tenant" class="mt-1 focus:ring-[#A47F6A] focus:border-[#A47F6A] block w-full shadow-sm sm:text-sm border-gray-300 rounded-md">
+                            </div>
+                            <div id="category-field" class="hidden">
+                                <label for="category" class="block text-sm font-medium text-gray-700">Category</label>
+                                <input type="text" name="category" id="category" value="Utilities" class="mt-1 focus:ring-[#A47F6A] focus:border-[#A47F6A] block w-full shadow-sm sm:text-sm border-gray-300 rounded-md">
+                            </div>
+                            <div>
+                                <label for="description" class="block text-sm font-medium text-gray-700">Description</label>
+                                <input type="text" name="description" id="description" required class="mt-1 focus:ring-[#A47F6A] focus:border-[#A47F6A] block w-full shadow-sm sm:text-sm border-gray-300 rounded-md">
+                            </div>
+                            <div>
+                                <label for="amount" class="block text-sm font-medium text-gray-700">Amount (PHP)</label>
+                                <input type="number" name="amount" id="amount" required min="0" step="0.01" class="mt-1 focus:ring-[#A47F6A] focus:border-[#A47F6A] block w-full shadow-sm sm:text-sm border-gray-300 rounded-md">
+                            </div>
+                            <button type="submit" class="w-full btn bg-[#A47F6A] hover:bg-[#8e6b56] text-white font-bold py-2 px-4 rounded-lg">Add Transaction</button>
+                        </form>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // A simple, hardcoded password for owner access.
+            // For a real application, you would use a secure authentication system.
+            const ownerPassword = 'admin';
+            const localStorageKey = 'isLoggedIn';
+
+            let transactions = [
+                { id: 1, type: 'income', date: '2025-08-01', tenant: 'August Tenant', description: 'Monthly Rent', amount: 15000 },
+                { id: 2, type: 'income', date: '2025-08-26', tenant: 'August Tenant', description: 'Monthly Rent', amount: 4000 },
+                { id: 3, type: 'income', date: '2025-09-03', tenant: 'September Tenant', description: 'Monthly Rent', amount: 26000 },
+                { id: 4, type: 'expense', date: '2025-08-15', category: 'Maintenance', description: 'Plumbing repair', amount: 2500 },
+                { id: 5, type: 'expense', date: '2025-08-28', category: 'Utilities', description: 'Electricity Bill', amount: 1200 },
+                { id: 6, type: 'expense', date: '2025-09-01', category: 'Utilities', description: 'Water Bill', amount: 800 },
+                { id: 7, type: 'expense', date: '2025-09-05', category: 'Maintenance', description: 'Garden service', amount: 1000 },
+            ];
+
+            const currencyFormatter = new Intl.NumberFormat('en-PH', {
+                style: 'currency',
+                currency: 'PHP',
+            });
+
+            const incomeTab = document.getElementById('income-tab');
+            const expensesTab = document.getElementById('expenses-tab');
+            const incomeTableContainer = document.getElementById('income-table-container');
+            const expensesTableContainer = document.getElementById('expenses-table-container');
+            const form = document.getElementById('transaction-form');
+            const typeSelect = document.getElementById('type');
+            const tenantField = document.getElementById('tenant-field');
+            const categoryField = document.getElementById('category-field');
+
+            const authContainer = document.getElementById('auth-container');
+            const authForm = document.getElementById('auth-form');
+            const transactionManager = document.getElementById('transaction-manager');
+            const logoutBtn = document.getElementById('logout-btn');
+
+            let chart;
+
+            function setupEventListeners() {
+                incomeTab.addEventListener('click', () => showTab('income'));
+                expensesTab.addEventListener('click', () => showTab('expenses'));
+                form.addEventListener('submit', handleAddTransaction);
+                typeSelect.addEventListener('change', toggleFormFields);
+                authForm.addEventListener('submit', handleLogin);
+                logoutBtn.addEventListener('click', handleLogout);
+
+                document.getElementById('income-tbody').addEventListener('click', handleDelete);
+                document.getElementById('expenses-tbody').addEventListener('click', handleDelete);
+            }
+
+            function showTab(type) {
+                if (type === 'income') {
+                    incomeTab.classList.add('active');
+                    expensesTab.classList.remove('active');
+                    incomeTableContainer.classList.remove('hidden');
+                    expensesTableContainer.classList.add('hidden');
+                } else {
+                    incomeTab.classList.remove('active');
+                    expensesTab.classList.add('active');
+                    incomeTableContainer.classList.add('hidden');
+                    expensesTableContainer.classList.remove('hidden');
+                }
+            }
+            
+            function toggleFormFields() {
+                if (typeSelect.value === 'income') {
+                    tenantField.classList.remove('hidden');
+                    categoryField.classList.add('hidden');
+                } else {
+                    tenantField.classList.add('hidden');
+                    categoryField.classList.remove('hidden');
+                }
+            }
+
+            function handleAddTransaction(e) {
+                e.preventDefault();
+                const formData = new FormData(form);
+                const newTransaction = {
+                    id: Date.now(),
+                    type: formData.get('type'),
+                    date: formData.get('date'),
+                    description: formData.get('description'),
+                    amount: parseFloat(formData.get('amount')),
+                    tenant: formData.get('tenant') || '',
+                    category: formData.get('category') || '',
+                };
+                transactions.push(newTransaction);
+                form.reset();
+                toggleFormFields();
+                updateUI();
+            }
+
+            function handleDelete(e) {
+                if (e.target.classList.contains('delete-btn')) {
+                    const id = parseInt(e.target.dataset.id);
+                    transactions = transactions.filter(t => t.id !== id);
+                    updateUI();
+                }
+            }
+            
+            function updateUI() {
+                updateSummaryCards();
+                updateTransactionTables();
+                updateChart();
+            }
+
+            function updateSummaryCards() {
+                const totalIncome = transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
+                const totalExpenses = transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+                const netProfit = totalIncome - totalExpenses;
+
+                document.getElementById('totalIncome').textContent = currencyFormatter.format(totalIncome);
+                document.getElementById('totalExpenses').textContent = currencyFormatter.format(totalExpenses);
+                document.getElementById('netProfit').textContent = currencyFormatter.format(netProfit);
+            }
+            
+            function updateTransactionTables() {
+                const incomeTbody = document.getElementById('income-tbody');
+                const expensesTbody = document.getElementById('expenses-tbody');
+                incomeTbody.innerHTML = '';
+                expensesTbody.innerHTML = '';
+
+                transactions.forEach(t => {
+                    const row = document.createElement('tr');
+                    row.className = "hover:bg-gray-50";
+                    if (t.type === 'income') {
+                        row.innerHTML = `
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${t.date}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${t.tenant}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${t.description}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-semibold text-right">${currencyFormatter.format(t.amount)}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                <button data-id="${t.id}" class="delete-btn text-red-600 hover:text-red-900">Delete</button>
+                            </td>
+                        `;
+                        incomeTbody.appendChild(row);
+                    } else {
+                         row.innerHTML = `
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${t.date}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${t.category}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${t.description}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-red-600 font-semibold text-right">${currencyFormatter.format(t.amount)}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                <button data-id="${t.id}" class="delete-btn text-red-600 hover:text-red-900">Delete</button>
+                            </td>
+                        `;
+                        expensesTbody.appendChild(row);
+                    }
+                });
+            }
+            
+            function prepareChartData() {
+                const monthlyData = {};
+                transactions.forEach(t => {
+                    const month = t.date.substring(0, 7);
+                    if (!monthlyData[month]) {
+                        monthlyData[month] = { income: 0, expense: 0 };
+                    }
+                    monthlyData[month][t.type] += t.amount;
+                });
+
+                const sortedMonths = Object.keys(monthlyData).sort();
+                
+                return {
+                    labels: sortedMonths.map(month => new Date(month + '-02').toLocaleString('default', { month: 'long', year: 'numeric' })),
+                    incomeData: sortedMonths.map(month => monthlyData[month].income),
+                    expenseData: sortedMonths.map(month => monthlyData[month].expense),
+                };
+            }
+            
+            function initializeChart() {
+                const ctx = document.getElementById('incomeExpenseChart').getContext('2d');
+                const { labels, incomeData, expenseData } = prepareChartData();
+                
+                chart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: 'Income',
+                                data: incomeData,
+                                backgroundColor: 'rgba(52, 211, 153, 0.7)',
+                                borderColor: 'rgba(5, 150, 105, 1)',
+                                borderWidth: 1,
+                                borderRadius: 4,
+                            },
+                            {
+                                label: 'Expenses',
+                                data: expenseData,
+                                backgroundColor: 'rgba(239, 68, 68, 0.7)',
+                                borderColor: 'rgba(185, 28, 28, 1)',
+                                borderWidth: 1,
+                                borderRadius: 4,
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    callback: function(value) {
+                                        return currencyFormatter.format(value).replace('₱', '₱ ');
+                                    }
+                                }
+                            },
+                            x: {
+                                grid: {
+                                    display: false,
+                                }
+                            }
+                        },
+                        plugins: {
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        let label = context.dataset.label || '';
+                                        if (label) {
+                                            label += ': ';
+                                        }
+                                        if (context.parsed.y !== null) {
+                                            label += currencyFormatter.format(context.parsed.y);
+                                        }
+                                        return label;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            function updateChart() {
+                const { labels, incomeData, expenseData } = prepareChartData();
+                chart.data.labels = labels;
+                chart.data.datasets[0].data = incomeData;
+                chart.data.datasets[1].data = expenseData;
+                chart.update();
+            }
+
+            function handleLogin(e) {
+                e.preventDefault();
+                const passwordInput = document.getElementById('password');
+                if (passwordInput.value === ownerPassword) {
+                    localStorage.setItem(localStorageKey, 'true');
+                    renderUI();
+                } else {
+                    // Use a simple alert for this example. For a real app, use a custom modal.
+                    alert("Incorrect password.");
+                }
+                passwordInput.value = '';
+            }
+
+            function handleLogout() {
+                localStorage.removeItem(localStorageKey);
+                renderUI();
+            }
+
+            function renderUI() {
+                const isLoggedIn = localStorage.getItem(localStorageKey) === 'true';
+                if (isLoggedIn) {
+                    authContainer.classList.add('hidden');
+                    transactionManager.classList.remove('hidden');
+                } else {
+                    authContainer.classList.remove('hidden');
+                    transactionManager.classList.add('hidden');
+                }
+            }
+
+            // Initial calls to set up the dashboard
+            initializeChart();
+            setupEventListeners();
+            updateUI();
+            renderUI();
+        });
+    </script>
+</body>
+</html>
