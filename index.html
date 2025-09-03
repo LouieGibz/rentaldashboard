@@ -9,29 +9,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <!-- Firebase Libraries -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // Global variables provided by the environment
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-        
-        // Initialize Firebase
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        
-        // Expose to global scope for use in the script
-        window.firebase = {
-            auth, db, onAuthStateChanged, signInAnonymously, signInWithCustomToken, collection, query, onSnapshot, addDoc, deleteDoc, doc
-        };
-    </script>
     <!-- Chosen Palette: Earthy Neutral -->
-    <!-- Application Structure Plan: The application is designed as an interactive dashboard. This structure was chosen for maximum usability, allowing the user to see key financial metrics at a glance (Total Income, Expenses, Net Profit), visualize trends over time with a bar chart, and manage detailed transactions through a tabbed interface with a delete button. This is superior to a static report because it centralizes data viewing and data entry, providing immediate feedback as new transactions are added. The user flow is: 1. Absorb high-level summary. 2. Analyze visual trends. 3. Drill down into specific income/expense lists. 4. Add new data, which instantly updates all other components. -->
+    <!-- Application Structure Plan: The application is designed as an interactive dashboard. This structure was chosen for maximum usability, allowing the user to see key financial metrics at a glance (Total Income, Expenses, Net Profit), visualize trends over time with a bar chart, and manage detailed transactions through a tabbed interface with an with a delete button. This is superior to a static report because it centralizes data viewing and data entry, providing immediate feedback as new transactions are added. The user flow is: 1. Absorb high-level summary. 2. Analyze visual trends. 3. Drill down into specific income/expense lists. 4. Add new data, which instantly updates all other components. -->
     <!-- Visualization & Content Choices: 
         - Report Info: Financial Summary (Total Income, Expenses, Net) -> Goal: Inform -> Viz/Presentation: Large text "Stat Cards" -> Interaction: Dynamic updates -> Justification: Provides the most critical data points for immediate consumption.
         - Report Info: Monthly Income vs. Expenses -> Goal: Compare/Change -> Viz/Presentation: Bar Chart -> Interaction: Hover tooltips, dynamic updates on new data -> Justification: Visually represents financial performance over time, making trends easy to spot. Library: Chart.js (Canvas).
@@ -90,14 +69,9 @@
 </head>
 <body class="antialiased">
     <div class="container mx-auto p-4 md:p-8 max-w-7xl">
-        <header class="mb-8 flex justify-between items-center flex-wrap gap-4">
-            <div>
-                <h1 class="text-4xl font-bold text-gray-800">Rental Income Dashboard</h1>
-                <p id="propertyAddress" class="text-lg text-gray-500 mt-1">[Your Property Address Here]</p>
-            </div>
-            <div class="text-right text-gray-500 text-sm">
-                <span id="userIdDisplay" class="font-mono">User ID: Loading...</span>
-            </div>
+        <header class="mb-8">
+            <h1 class="text-4xl font-bold text-gray-800">Rental Income Dashboard</h1>
+            <p id="propertyAddress" class="text-lg text-gray-500 mt-1">[Your Property Address Here]</p>
         </header>
 
         <main>
@@ -173,6 +147,18 @@
                 </div>
             </section>
 
+            <div id="auth-container" class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm mt-8 max-w-lg mx-auto">
+                <h2 class="text-xl font-semibold text-gray-700 mb-4">Owner Login</h2>
+                <p class="text-gray-600 mb-4">Enter the password to access transaction management tools.</p>
+                <form id="auth-form" class="space-y-4">
+                    <div>
+                        <label for="password" class="sr-only">Password</label>
+                        <input type="password" name="password" id="password" placeholder="Enter password" required class="mt-1 focus:ring-[#A47F6A] focus:border-[#A47F6A] block w-full shadow-sm sm:text-sm border-gray-300 rounded-md">
+                    </div>
+                    <button type="submit" class="w-full btn bg-[#A47F6A] hover:bg-[#8e6b56] text-white font-bold py-2 px-4 rounded-lg">Log In</button>
+                </form>
+            </div>
+
             <div id="transaction-manager" class="hidden">
                  <div class="flex justify-between items-center mt-8 mb-4">
                     <h2 class="text-3xl font-semibold text-gray-700">Owner Tools</h2>
@@ -216,17 +202,22 @@
         </main>
     </div>
 
-    <script type="module">
-        import { getDoc, doc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        
-        document.addEventListener('DOMContentLoaded', async () => {
-            // Get Firebase instances from the global scope
-            const { auth, db, onAuthStateChanged, signInAnonymously, signInWithCustomToken, collection, query, onSnapshot, addDoc, deleteDoc } = window.firebase;
-            
-            const transactionsCollectionName = 'transactions';
-            let userId = null;
-            let transactions = [];
-            let chart;
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // A simple, hardcoded password for owner access.
+            // For a real application, you would use a secure authentication system.
+            const ownerPassword = 'admin';
+            const localStorageKey = 'isLoggedIn';
+
+            let transactions = [
+                { id: 1, type: 'income', date: '2025-08-01', tenant: 'August Tenant', description: 'Monthly Rent', amount: 15000 },
+                { id: 2, type: 'income', date: '2025-08-26', tenant: 'August Tenant', description: 'Monthly Rent', amount: 4000 },
+                { id: 3, type: 'income', date: '2025-09-03', tenant: 'September Tenant', description: 'Monthly Rent', amount: 26000 },
+                { id: 4, type: 'expense', date: '2025-08-15', category: 'Maintenance', description: 'Plumbing repair', amount: 2500 },
+                { id: 5, type: 'expense', date: '2025-08-28', category: 'Utilities', description: 'Electricity Bill', amount: 1200 },
+                { id: 6, type: 'expense', date: '2025-09-01', category: 'Utilities', description: 'Water Bill', amount: 800 },
+                { id: 7, type: 'expense', date: '2025-09-05', category: 'Maintenance', description: 'Garden service', amount: 1000 },
+            ];
 
             const currencyFormatter = new Intl.NumberFormat('en-PH', {
                 style: 'currency',
@@ -241,55 +232,23 @@
             const typeSelect = document.getElementById('type');
             const tenantField = document.getElementById('tenant-field');
             const categoryField = document.getElementById('category-field');
+
+            const authContainer = document.getElementById('auth-container');
             const transactionManager = document.getElementById('transaction-manager');
-            const userIdDisplay = document.getElementById('userIdDisplay');
+            const authForm = document.getElementById('auth-form');
+            const logoutBtn = document.getElementById('logout-btn');
+            const ownerElements = document.querySelectorAll('.owner-only');
 
-            // Set up Firebase Auth listener
-            onAuthStateChanged(auth, async (user) => {
-                if (user) {
-                    userId = user.uid;
-                    userIdDisplay.textContent = `User ID: ${userId}`;
-                    transactionManager.classList.remove('hidden');
-                    setupFirestoreListener();
-                } else {
-                    userId = null;
-                    userIdDisplay.textContent = `User ID: Not authenticated`;
-                    transactionManager.classList.add('hidden');
-                    // Sign in with the custom token if available, otherwise anonymously
-                    const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-                    if (initialAuthToken) {
-                        try {
-                             await signInWithCustomToken(auth, initialAuthToken);
-                        } catch (error) {
-                             console.error("Error signing in with custom token:", error);
-                             await signInAnonymously(auth);
-                        }
-                    } else {
-                        await signInAnonymously(auth);
-                    }
-                }
-            });
-
-            function setupFirestoreListener() {
-                const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-                const colPath = `/artifacts/${appId}/users/${userId}/${transactionsCollectionName}`;
-                const q = query(collection(db, colPath));
-
-                onSnapshot(q, (snapshot) => {
-                    const newTransactions = [];
-                    snapshot.forEach(doc => {
-                        newTransactions.push({ id: doc.id, ...doc.data() });
-                    });
-                    transactions = newTransactions;
-                    updateUI();
-                });
-            }
+            let chart;
 
             function setupEventListeners() {
                 incomeTab.addEventListener('click', () => showTab('income'));
                 expensesTab.addEventListener('click', () => showTab('expenses'));
                 form.addEventListener('submit', handleAddTransaction);
                 typeSelect.addEventListener('change', toggleFormFields);
+                authForm.addEventListener('submit', handleLogin);
+                logoutBtn.addEventListener('click', handleLogout);
+
                 document.getElementById('income-tbody').addEventListener('click', handleDelete);
                 document.getElementById('expenses-tbody').addEventListener('click', handleDelete);
             }
@@ -318,10 +277,11 @@
                 }
             }
 
-            async function handleAddTransaction(e) {
+            function handleAddTransaction(e) {
                 e.preventDefault();
                 const formData = new FormData(form);
                 const newTransaction = {
+                    id: Date.now(),
                     type: formData.get('type'),
                     date: formData.get('date'),
                     description: formData.get('description'),
@@ -329,28 +289,17 @@
                     tenant: formData.get('tenant') || '',
                     category: formData.get('category') || '',
                 };
-
-                const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-                const colPath = `/artifacts/${appId}/users/${userId}/${transactionsCollectionName}`;
-                try {
-                    await addDoc(collection(db, colPath), newTransaction);
-                    form.reset();
-                    toggleFormFields();
-                } catch (error) {
-                    console.error("Error adding document: ", error);
-                }
+                transactions.push(newTransaction);
+                form.reset();
+                toggleFormFields();
+                updateUI();
             }
 
-            async function handleDelete(e) {
+            function handleDelete(e) {
                 if (e.target.classList.contains('delete-btn')) {
-                    const transactionId = e.target.dataset.id;
-                    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-                    const docPath = `/artifacts/${appId}/users/${userId}/${transactionsCollectionName}/${transactionId}`;
-                    try {
-                        await deleteDoc(doc(db, docPath));
-                    } catch (error) {
-                        console.error("Error removing document: ", error);
-                    }
+                    const id = parseInt(e.target.dataset.id);
+                    transactions = transactions.filter(t => t.id !== id);
+                    updateUI();
                 }
             }
             
@@ -385,7 +334,7 @@
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${t.tenant}</td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${t.description}</td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-semibold text-right">${currencyFormatter.format(t.amount)}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium owner-only">
                                 <button data-id="${t.id}" class="delete-btn text-red-600 hover:text-red-900">Delete</button>
                             </td>
                         `;
@@ -396,13 +345,14 @@
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${t.category}</td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${t.description}</td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-red-600 font-semibold text-right">${currencyFormatter.format(t.amount)}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium owner-only">
                                 <button data-id="${t.id}" class="delete-btn text-red-600 hover:text-red-900">Delete</button>
                             </td>
                         `;
                         expensesTbody.appendChild(row);
                     }
                 });
+                renderOwnerElements();
             }
             
             function prepareChartData() {
@@ -497,9 +447,51 @@
                 chart.update();
             }
             
+            function handleLogin(e) {
+                e.preventDefault();
+                const passwordInput = document.getElementById('password');
+                if (passwordInput.value === ownerPassword) {
+                    localStorage.setItem(localStorageKey, 'true');
+                    renderUI();
+                } else {
+                    // Use a simple alert for this example. For a real app, use a custom modal.
+                    alert("Incorrect password.");
+                }
+                passwordInput.value = '';
+            }
+
+            function handleLogout() {
+                localStorage.removeItem(localStorageKey);
+                renderUI();
+            }
+
+            function renderUI() {
+                const isLoggedIn = localStorage.getItem(localStorageKey) === 'true';
+                if (isLoggedIn) {
+                    authContainer.classList.add('hidden');
+                    transactionManager.classList.remove('hidden');
+                } else {
+                    authContainer.classList.remove('hidden');
+                    transactionManager.classList.add('hidden');
+                }
+                renderOwnerElements();
+            }
+
+            function renderOwnerElements() {
+                const isLoggedIn = localStorage.getItem(localStorageKey) === 'true';
+                ownerElements.forEach(el => {
+                    if (isLoggedIn) {
+                        el.classList.remove('owner-only');
+                    } else {
+                        el.classList.add('owner-only');
+                    }
+                });
+            }
+
             // Initial calls to set up the dashboard
             initializeChart();
             setupEventListeners();
+            updateUI();
         });
     </script>
 </body>
